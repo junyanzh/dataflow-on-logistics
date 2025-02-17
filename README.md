@@ -1,53 +1,62 @@
 # Logistics Events Pipeline PoC
 
-This repository demonstrates a complete end-to-end proof-of-concept (PoC) for simulating and processing logistics events in a cloud environment using Google Cloud Platform services.
+This repository provides a complete proof-of-concept (PoC) for simulating and processing logistics events on Google Cloud Platform (GCP). It includes the necessary scripts and code to generate random events, process them using an Apache Beam pipeline on Dataflow, and store both raw and aggregated data in BigQuery.
 
-## Overview
-
-The project consists of two main components:
+## Repository Overview
 
 - **Event Generator**  
-  The event generator simulates logistics activities by randomly creating events (e.g., order creation, stock checking, shipping, and delivery). These events are published to Google Cloud Pub/Sub.  
-  *File:* [event_generator.py](./event_generator.py)
+  - *File:* `event_generator.py`  
+  Generates random logistics events (e.g., order creation, stock checking, shipping, delivery) and publishes them to a Pub/Sub topic.
 
 - **Dataflow Pipeline**  
-  The Apache Beam pipeline reads the events from Pub/Sub, processes and transforms the data (including adding processing timestamps and aggregating events within fixed time windows), and writes both raw events and aggregated metrics into BigQuery.  
-  *File:* [logistics_pipeline.py](./logistics_pipeline.py)
+  - *File:* `logistics_pipeline.py`  
+  Defines an Apache Beam pipeline that reads events from Pub/Sub, processes them (e.g., adds timestamps, performs windowing/aggregation), and writes both raw and aggregated data to BigQuery.
 
-## Pipeline Components
+- **Environment Setup**  
+  - *File:* `create_streaming_sinks.sh`  
+  Sets up the required GCP resources such as a GCS bucket, BigQuery dataset/tables, and Pub/Sub topic.
 
-### Pipeline Files
+## Usage
 
-- **logistics_pipeline.py**  
-  Contains the main Dataflow pipeline code, which reads from Pub/Sub, processes the events, and writes results to BigQuery.
-
-- **event_generator.py**  
-  Contains the code to generate logistics events and publish them to the Pub/Sub topic.
-
-### Environment Setup Script
-
-The repository includes the following bash script to set up the required GCP resources:
+- **Setting Up GCP Resources**: Refer to the `create_streaming_sinks.sh` script for the commands to create your GCP resources.  
+- **Running the Pipeline**: Refer to the documentation or scripts (e.g., `pipeline_run.sh`) for detailed instructions and additional parameters. Below is an example snippet in a single code block:
 
 ```bash
-#!/usr/bin/env bash
-echo "Creating pipeline sinks"
+export PROJECT_ID=$(gcloud config get-value project)
+export REGION='us-west1'
+export BUCKET=gs://${PROJECT_ID}
+export PIPELINE_FOLDER=${BUCKET}
+export RUNNER=DataflowRunner
+export PUBSUB_TOPIC=projects/${PROJECT_ID}/topics/logistics_events
+export WINDOW_DURATION=60
+export AGGREGATE_TABLE_NAME=${PROJECT_ID}:logistics_data.logistics_metrics
+export RAW_TABLE_NAME=${PROJECT_ID}:logistics_data.logistics_events
 
-PROJECT_ID=$(gcloud config get-value project)
+python3 logistics_pipeline.py \
+    --project=${PROJECT_ID} \
+    --region=${REGION} \
+    --staging_location=${PIPELINE_FOLDER}/staging \
+    --temp_location=${PIPELINE_FOLDER}/temp \
+    --runner=${RUNNER} \
+    --input_topic=${PUBSUB_TOPIC} \
+    --window_duration=${WINDOW_DURATION} \
+    --agg_table_name=${AGGREGATE_TABLE_NAME} \
+    --raw_table_name=${RAW_TABLE_NAME}
+```
 
-# GCS bucket
-gsutil mb -l US gs://$PROJECT_ID
 
-# BigQuery Dataset
-bq mk --location=US logistics_data
 
-# Create tables schema
-bq mk --table \
-  logistics_data.logistics_events \
-  event_id:STRING,order_id:STRING,product_id:STRING,status:STRING,event_timestamp:STRING,processing_timestamp:STRING,warehouse_id:STRING
 
-bq mk --table \
-  logistics_data.logistics_metrics \
-  window_start:TIMESTAMP,window_end:TIMESTAMP,status:STRING,count:INTEGER,avg_processing_time:FLOAT
+- Generating Events: Refer to event_generator.py and related documentation for instructions on installing dependencies and running the event generator.
 
-# PubSub Topic
-gcloud pubsub topics create logistics_events
+- Verifying in BigQuery: SQL queries for verification are available in the corresponding documentation or comments within the code.
+
+## Summary
+In this PoC, you can generate, process, and aggregate logistics events using GCP services. For more details, explore the following files:
+
+- **event_generator.py**
+- **logistics_pipeline.py**
+- **create_streaming_sinks.sh**
+
+  
+Feel free to modify the code to fit your own use cases!
